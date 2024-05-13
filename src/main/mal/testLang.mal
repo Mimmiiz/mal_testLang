@@ -1,0 +1,91 @@
+/*
+ * Copyright 2020-2022 Foreseeti AB <https://foreseeti.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#id: "com.example.testlang"
+#version: "1.0.0"
+
+category System {
+
+  asset Firewall 
+  user info: "A firewall which can block traffic to a network by inspecting the header or payload"
+  {
+    | compromiseManagerSoftware
+      user info: "If the Firewall manager software is compromised the attacker may modify the Firewall rules"
+      -> bypass
+
+    & bypass
+      ->  networks.access,
+          networks.sendMaliciousFiles
+
+    | attemptBypassHeaderInspection
+      -> bypassedHeaderInspection
+
+    & bypassedHeaderInspection
+    user info: "Bypassing the header inspection is possible if for instance the rules are misconfigured or not enabled"
+      -> networks.access
+
+    # headerInspection
+      -> bypassedHeaderInspection
+
+    | attemptBypassPayloadInspection
+      -> bypassedPayloadInspection
+
+    & bypassedPayloadInspection
+    user info: "Bypassing payload inspection if it is misconfigured or not enabled alowing for malicious content to enter the network"
+      -> networks.sendMaliciousFiles
+
+    # payloadInspection
+      -> bypassedPayloadInspection
+  }
+
+  asset Network {
+    user info: "Represents a network (e.g., a LAN)"
+    | access 
+      -> servers.connect
+    | sendMaliciousFiles
+      -> servers.uploadMaliciousFiles
+  }
+
+  asset Server {
+    | connect
+      -> compromise
+    | authenticate
+      -> compromise
+    & compromise 
+      ->  storedCredentials.access,
+          uploadMaliciousFiles
+    & uploadMaliciousFiles
+    
+  }
+
+  asset Credentials {
+    | access
+      -> compromiseUnencrypted
+    & compromiseUnencrypted
+      -> targetServer.authenticate
+  }
+}
+
+associations {
+  Firewall [firewalls] * <-- NetworkAccess --> * [networks] Network
+  Server [servers] * <-- NetworkAccess --> * [networks] Network
+  Server [databaseServer] 0..1 <-- Storage --> * [storedCredentials] Credentials
+  Server [targetServer] * <-- Access --> * [authCredentials] Credentials
+}
+
+
+
+
+
